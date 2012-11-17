@@ -1,0 +1,3 @@
+#/bin/bash
+
+livescript -w -o . -c src/

@@ -1,0 +1,8 @@
+#/bin/bash
+
+if [[ "$@" =~ "spec" ]]
+then
+  mocha -u tdd "$@" 
+else
+  mocha -u tdd "$@" spec/*
+fi
