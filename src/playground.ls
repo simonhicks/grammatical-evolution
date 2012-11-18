@@ -63,38 +63,40 @@ class CodeBuilder
 
   # returns the next expansion for `key` by selecting the nth item from cycling through `key`s value in `@grammar` (where n is the next int from `@integers`)
   expansion-for-key: (key) ~>
-    set = @options-for-key(key)
-    index = @next-integer() % set.length
-    @increment-offset()
-    set[index]
-
-  # returns true if `key` can't be expanded any further
-  is-terminal: (key) ~>
-    _.any @@terminal-keys, -> key == it
-
-  # returns true if `str` can be expanded further (in other words if it contains any expandable keys)
-  is-expandable: (str) ~>
-    _.any @@expandable-keys, -> str.match it
-
-  # the possible expansions for `key`, taken from `@@grammar`.
-  options-for-key: (key) ->
-    @@grammar[key] |> @filter-for-depth # FIXME move this logic into Grammar & add something to make sure this result isn't empty
-
-  # filters the list of possible expressions to ensure we don't stop expanding until we reach a certain depth, but stop before the expression is too deep.
-  filter-for-depth: (options) ~>
-    | @depth < @@min-depth => _.reject options, @is-terminal
-    | @depth > (@@max-depth - 1) => _.reject options, @is-expandable
-    | otherwise => options
+    options = @options-for-key(key)
+    index = @next-integer() % options.length
+    options[index]
 
   next-integer: ->
-    @integers[@offset]
+    i = @integers[@offset]
+    @increment-offset()
+    i
 
   increment-offset: ->
-    @offset := if (@offset == @integers.length - 1) then 0 else @offset + 1
+    @offset = if (@offset == @integers.length - 1) then 0 else @offset + 1
 
   continue: ->
     patterns = _.chain @@grammar .keys!.map(-> new RegExp(it)).value()
     _.any patterns, ~> it.test(@symbolic-string)
+
+  ## returns true if `key` can't be expanded any further
+  #is-terminal: (key) ~>
+    #keys = _.keys(@@grammar)
+    #_.contains(keys, key) && not @is-expandable key
+
+  ## returns true if `str` can be expanded further (in other words if it contains any expandable keys)
+  #is-expandable: (str) ~>
+    #_.any @@expandable-keys, -> str.match it
+
+  ## the possible expansions for `key`, taken from `@@grammar`.
+  #options-for-key: (key) ->
+    #@@grammar[key] |> @filter-for-depth # FIXME move this logic into Grammar & add something to make sure this result isn't empty
+
+  ## filters the list of possible expressions to ensure we don't stop expanding until we reach a certain depth, but stop before the expression is too deep.
+  #filter-for-depth: (options) ~>
+    #| @depth < @@min-depth => _.reject options, @is-terminal
+    #| @depth > (@@max-depth - 1) => _.reject options, @is-expandable
+    #| otherwise => options
 
 
 ## tournament.ls
@@ -159,69 +161,69 @@ class Tournament
 
 # TEST AREA -- dummy impls for game and bot
 
-#class Bot
-  #@last-id = 0
-  #({@id = ++@@last-id, @code}) ->
+class Bot
+  @last-id = 0
+  ({@id = ++@@last-id, @code}) ->
 
-#class Game
-  #@play = (bot1, bot2, opts) ->
-    #instance = new Game bot1, bot2, opts
-    #instance.play()
-    #instance.get-winner()
+class Game
+  @play = (bot1, bot2, opts) ->
+    instance = new Game bot1, bot2, opts
+    instance.play()
+    instance.get-winner()
 
-  #(@bot1, @bot2, {@function,@min-input,@max-input}) ->
+  (@bot1, @bot2, {@function,@min-input,@max-input}) ->
 
-  #get-input: ->
-    #@x ?= Math.floor(Math.random() * (@max-input - @min-input)) + @min-input
+  get-input: ->
+    @x ?= Math.floor(Math.random() * (@max-input - @min-input)) + @min-input
 
-  #get-context: ->
-    #@context ?= vm.create-context do
-      #x: @get-input()
+  get-context: ->
+    @context ?= vm.create-context do
+      x: @get-input()
 
-  #_run-code: (code) ->
-    #vm.run-in-context code, @get-context()
+  _run-code: (code) ->
+    vm.run-in-context code, @get-context()
 
-  #winner: (target, val1, val2) ->
-    #| val1 == val2 => false
-    #| val1 < val2  => @bot1.id
-    #| val2 < val1  => @bot2.id
+  winner: (target, val1, val2) ->
+    | val1 == val2 => false
+    | val1 < val2  => @bot1.id
+    | val2 < val1  => @bot2.id
 
-  #play: ->
-    #@target = @function @get-input()
-    #@val1 = Math.abs(@target - @_run-code @bot1.code)
-    #@val2 = Math.abs(@target - @_run-code @bot2.code)
+  play: ->
+    @target = @function @get-input()
+    @val1 = Math.abs(@target - @_run-code @bot1.code)
+    @val2 = Math.abs(@target - @_run-code @bot2.code)
 
-  #get-winner: ->
-    #@winner @target, @val1, @val2
+  get-winner: ->
+    @winner @target, @val1, @val2
 
-#random-bot = (id) ->
-  #ints = []
-  #_.times 20, ->
-    #ints.push Math.floor(Math.random() * 128)
-  #code = new CodeBuilder ints .code
-  #console.log code
-  #new Bot code: code, id: id
+random-bot = (id) ->
+  ints = []
+  _.times 20, ->
+    ints.push Math.floor(Math.random() * 128)
+  code = new CodeBuilder ints .code
+  console.log code
+  new Bot code: code, id: id
 
 
-#opts =
-  #function: (x) -> x**2 + x + 1
-  #rounds: 10
-  #max-input: 10
-  #min-input: 1
+opts =
+  function: (x) -> x**2 + x + 1
+  rounds: 10
+  max-input: 10
+  min-input: 1
 
-#bots =
-  #* random-bot \andy
-  #* random-bot \bill
-  #* random-bot \cath
-  #* random-bot \duke
-  #* random-bot \eddy
-  #* random-bot \fred
-  #* random-bot \gail
-  #* random-bot \hiro
+bots =
+  * random-bot \andy
+  * random-bot \bill
+  * random-bot \cath
+  * random-bot \duke
+  * random-bot \eddy
+  * random-bot \fred
+  * random-bot \gail
+  * random-bot \hiro
 
-#results = Tournament.run do
-  #bots: bots
-  #game-options: opts
+results = Tournament.run do
+  bots: bots
+  game-options: opts
 
-#console.log _.map results, (.id)
+console.log _.map results, (.id)
 

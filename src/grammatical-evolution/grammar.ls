@@ -1,12 +1,20 @@
 _ = require \underscore
 
 class exports.Grammar
-  (@rules) ->
+  @MAX-DEPTH = 7
+  @MIN-DEPTH = 2
+
+  ({@rules, @max-depth=@@MAX-DEPTH, @min-depth=@@MIN-DEPTH}) ->
+    @validate-args()
     @keys = _.keys @rules
     @key-regexp = new RegExp @keys.join("|"), 'g'
-    @validate()
+    @validate-rules()
 
-  validate: ->
+  validate-args: ->
+    unless @rules?
+      throw new Error "Missing mandatory arg `rules`"
+
+  validate-rules: ->
     for key in @keys when @_expands-to-self(key)
       throw new Error "Invalid Grammar: #key expands to itself causing a recursive loop"
     unless @rules[\S]?
@@ -28,8 +36,11 @@ class exports.Grammar
   initial-options: ->
     @rules[\S]
 
-  is-expandable: (key) ~>
-    @_is-expandable-key(key)
+  is-expandable: (str) ~>
+    if _.contains @keys, str
+      @_is-expandable-key(str)
+    else
+      @_is-expandable-expr(str)
 
   _is-expandable-key: (key) ~>
     @_is-expandable-key-cache ?= {}
@@ -42,9 +53,11 @@ class exports.Grammar
       else
         @_is-expandable-key(matched-keys[0])
 
-  is-terminal: (key) ~>
-    @_is-terminal-key(key)
+  get-options-for: (key, depth) ~>
+    | depth < @min-depth => @_filter-if-possible @rules[key], ~> not @is-expandable(it)
+    | depth > (@max-depth - 1) => @_filter-if-possible @rules[key], @is-expandable
+    | otherwise => @rules[key]
 
-  _is-terminal-key: (key) ~>
-    @_is-terminal-key-cache ?= {}
-    @_is-terminal-key-cache[key] ?= @_expands-to(key, \S) and not @_is-expandable-key(key)
+  _filter-if-possible: (exprs, pred) ~>
+    filtered = _.reject exprs, pred
+    if filtered.length is 0 then exprs else filtered
