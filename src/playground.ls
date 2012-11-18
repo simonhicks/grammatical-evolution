@@ -1,89 +1,28 @@
 _ = require \underscore
 
-## genetic-helpers.ls
-function random(limit)
-  Math.floor(Math.random() * limit)
-
-class GeneticHelper
-  BASE = 2 # FIXME make base configurable (ie. write a decent flip-bit for BASE != 2)
-  ({@codon-bits=8, @p-cross=0.3}:opts={}) ->
-
-  ints-to-bits: (ints) ~>
-    ljust = (s) ~> ('0' * (@codon-bits - s.length)) + s
-    binary-strings = _.map ints, (it) -> ljust(it.to-string(BASE))
-    binary-strings.join ''
-
-  bits-to-ints: (bits) ~>
-    bit-array = bits.split('')
-    ints = []
-    while bit-array.length > 0
-      section = []
-      _.times @codon-bits, ~>
-        section.push bit-array.shift()
-      section |> (-> it.join '') |> parse-int(_, BASE) |> ints.push
-    ints
-
-  flip-bit: (bit) ~>
-    1 .^. parse-int(bit, BASE)
-
-  point-mutation: (bits) ~>
-    child = _.map bits, (bit) ~>
-      if Math.random() < (1.0/bits.length) then @flip-bit bit else bit # FIXME make the `(1.0/bits.length)` configurable 
-    child.join ''
-
-  one-point-crossover: (parent1, parent2) ~>
-    if (Math.random() < @p-cross)
-      p1-ints = @bits-to-ints parent1
-      p2-ints = @bits-to-ints parent2
-      cut = random _.min [p1-ints.length, p2-ints.length]
-      @ints-to-bits p1-ints[0 til cut].concat(p2-ints.slice(cut))
-    else
-      _.clone parent1
-
-  codon-duplication: (bits) ->
-    if Math.random() < (0.5/@codon-bits) # FIXME make the `(0.5/@codon-bits)` configurable 
-      ints = @bits-to-ints bits
-      i = random(ints.length)
-      ints.push ints[i]
-      @ints-to-bits ints
-    else
-      _.clone bits
-
-  # TODO codon-deletion: (bits) ->
-  #   # delete a random codon
-
-  # TODO reproduce: (selected, population-size) ->
-  #   # produce `population-size` bitstrings using pairs of strings from `selected`
-
-  # TODO random-bitstring
-
+{Grammar} = require './grammatical-evolution/grammar'
 
 ## code-builder.ls
 vm = require \vm
 
-# TODO find a way to make this configurable... class variables are NOT the answer!
-#   - STEP 1 - change CodeBuilder into a 'TranslatorBuilder' which closes over the configuration variables and returns a function that converts bit-strings to code-strings
-#   - STEP 2 - change TranslatorBuilder into a 'SpeciesBuilder which does the same as above but returns a mixin which knows how to reproduce etc. using a genetics-helper instance as a c-var
-#   - That mixin can then be mixed in to essentially dummy classes :)
-
-function gsub(str, target, func)
-  words = _.compact str.split(/\s+/)
-  res = ''
-  for word in words
-    if word is target
-      res := "#res #{func word}"
-    else
-      res += " #word"
-  res
-
 class CodeBuilder
   @min-depth = 2
   @max-depth = 7
+
+  # the grammar should obey the following rules:
+  # - it should have exactly one key \S, with one value representing an expression. This is the root of the AST and will be the starting point for all expansions.
+  # - no higher order functions are allowed # FIXME is this still true??
   @grammar =
     S:    \EXP
-    EXP:  [' FUNC ( EXP , EXP ) ', 'VAR']
+    EXP:  ['FUNC(EXP, EXP)', 'VAR']
     FUNC: <[ add sub div mul ]>
     VAR:  <[ x 1.0 ]>
+
+  # the keys which represent a terminal (ie. something which can't be expanded any further and is an expression in it's own right.)
+  @terminal-keys = <[ VAR ]>
+
+  # the keys which represent an expandable expression.
+  @expandable-keys = <[ EXP ]>
 
   @function-definitions = '''
     function add(a, b) {
@@ -107,25 +46,55 @@ class CodeBuilder
     }
   '''
 
-  (integers) ->
-    [done, offset, depth] = [false, 0, 0]
-    symbolic-string = @@grammar[\S]
+  (@integers) ->
+    [@offset, @depth] = [0, 0]
+    @symbolic-string = @@grammar[\S]
     do
-      done := true
-      _.chain(@@grammar).keys().each (key) ~>
-        symbolic-string := gsub symbolic-string, key, (k) ~>
-          done := false
-          set = if (k is \EXP and depth >= (@@max-depth - 1)) then @@grammar[\VAR] else @@grammar[k]
-          var next
-          do
-            integer = integers[offset] % set.length
-            offset := if (offset == integers.length - 1) then 0 else offset + 1
-            next = set[integer]
-          until depth > @@min-depth or next isnt 'VAR'
-          next
-      depth++
-    until done
-    @code = "#{@@function-definitions}\n\n#symbolic-string"
+      @expand-keys()
+    while @continue()
+    @code = "#{@@function-definitions}\n\n#{@symbolic-string};"
+
+  expand-keys: ->
+    _.chain(@@grammar).keys().each (key) ~> @expand-key key
+    @depth++
+
+  expand-key: (key) ->
+    @symbolic-string := @symbolic-string.replace new RegExp(key, 'g'), @expansion-for-key
+
+  # returns the next expansion for `key` by selecting the nth item from cycling through `key`s value in `@grammar` (where n is the next int from `@integers`)
+  expansion-for-key: (key) ~>
+    set = @options-for-key(key)
+    index = @next-integer() % set.length
+    @increment-offset()
+    set[index]
+
+  # returns true if `key` can't be expanded any further
+  is-terminal: (key) ~>
+    _.any @@terminal-keys, -> key == it
+
+  # returns true if `str` can be expanded further (in other words if it contains any expandable keys)
+  is-expandable: (str) ~>
+    _.any @@expandable-keys, -> str.match it
+
+  # the possible expansions for `key`, taken from `@@grammar`.
+  options-for-key: (key) ->
+    @@grammar[key] |> @filter-for-depth # FIXME move this logic into Grammar & add something to make sure this result isn't empty
+
+  # filters the list of possible expressions to ensure we don't stop expanding until we reach a certain depth, but stop before the expression is too deep.
+  filter-for-depth: (options) ~>
+    | @depth < @@min-depth => _.reject options, @is-terminal
+    | @depth > (@@max-depth - 1) => _.reject options, @is-expandable
+    | otherwise => options
+
+  next-integer: ->
+    @integers[@offset]
+
+  increment-offset: ->
+    @offset := if (@offset == @integers.length - 1) then 0 else @offset + 1
+
+  continue: ->
+    patterns = _.chain @@grammar .keys!.map(-> new RegExp(it)).value()
+    _.any patterns, ~> it.test(@symbolic-string)
 
 
 ## tournament.ls
@@ -188,7 +157,7 @@ class Tournament
     _.sort-by(@get-bots(), ({id}) ~> @get-wins(id)).reverse()
 
 
-## TEST AREA -- dummy impls for game and bot
+# TEST AREA -- dummy impls for game and bot
 
 #class Bot
   #@last-id = 0
@@ -230,6 +199,7 @@ class Tournament
   #_.times 20, ->
     #ints.push Math.floor(Math.random() * 128)
   #code = new CodeBuilder ints .code
+  #console.log code
   #new Bot code: code, id: id
 
 
@@ -247,7 +217,7 @@ class Tournament
   #* random-bot \eddy
   #* random-bot \fred
   #* random-bot \gail
-  #* random-bot \hall
+  #* random-bot \hiro
 
 #results = Tournament.run do
   #bots: bots

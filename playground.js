@@ -1,107 +1,8 @@
 (function(){
-  var _, GeneticHelper, vm, CodeBuilder, Tournament, slice$ = [].slice;
+  var _, Grammar, vm, CodeBuilder, Tournament;
   _ = require('underscore');
-  function random(limit){
-    return Math.floor(Math.random() * limit);
-  }
-  GeneticHelper = (function(){
-    GeneticHelper.displayName = 'GeneticHelper';
-    var BASE, prototype = GeneticHelper.prototype, constructor = GeneticHelper;
-    BASE = 2;
-    function GeneticHelper(opts){
-      var ref$, ref1$;
-      ref$ = opts != null
-        ? opts
-        : {}, this.codonBits = (ref1$ = ref$.codonBits) != null ? ref1$ : 8, this.pCross = (ref1$ = ref$.pCross) != null ? ref1$ : 0.3;
-      this.onePointCrossover = bind$(this, 'onePointCrossover', prototype);
-      this.pointMutation = bind$(this, 'pointMutation', prototype);
-      this.flipBit = bind$(this, 'flipBit', prototype);
-      this.bitsToInts = bind$(this, 'bitsToInts', prototype);
-      this.intsToBits = bind$(this, 'intsToBits', prototype);
-    }
-    prototype.intsToBits = function(ints){
-      var ljust, binaryStrings, this$ = this;
-      ljust = function(s){
-        return repeatString$('0', this$.codonBits - s.length) + s;
-      };
-      binaryStrings = _.map(ints, function(it){
-        return ljust(it.toString(BASE));
-      });
-      return binaryStrings.join('');
-    };
-    prototype.bitsToInts = function(bits){
-      var bitArray, ints, section, this$ = this;
-      bitArray = bits.split('');
-      ints = [];
-      while (bitArray.length > 0) {
-        section = [];
-        _.times(this.codonBits, fn$);
-        ints.push(
-        partialize$(parseInt, [void 8, BASE], [0])(
-        fn1$(
-        section)));
-      }
-      return ints;
-      function fn$(){
-        return section.push(bitArray.shift());
-      }
-      function fn1$(it){
-        return it.join('');
-      }
-    };
-    prototype.flipBit = function(bit){
-      return 1 ^ parseInt(bit, BASE);
-    };
-    prototype.pointMutation = function(bits){
-      var child, this$ = this;
-      child = _.map(bits, function(bit){
-        if (Math.random() < 1.0 / bits.length) {
-          return this$.flipBit(bit);
-        } else {
-          return bit;
-        }
-      });
-      return child.join('');
-    };
-    prototype.onePointCrossover = function(parent1, parent2){
-      var p1Ints, p2Ints, cut;
-      if (Math.random() < this.pCross) {
-        p1Ints = this.bitsToInts(parent1);
-        p2Ints = this.bitsToInts(parent2);
-        cut = random(_.min([p1Ints.length, p2Ints.length]));
-        return this.intsToBits(slice$.call(p1Ints, 0, cut).concat(p2Ints.slice(cut)));
-      } else {
-        return _.clone(parent1);
-      }
-    };
-    prototype.codonDuplication = function(bits){
-      var ints, i;
-      if (Math.random() < 0.5 / this.codonBits) {
-        ints = this.bitsToInts(bits);
-        i = random(ints.length);
-        ints.push(ints[i]);
-        return this.intsToBits(ints);
-      } else {
-        return _.clone(bits);
-      }
-    };
-    return GeneticHelper;
-  }());
+  Grammar = require('./grammatical-evolution/grammar').Grammar;
   vm = require('vm');
-  function gsub(str, target, func){
-    var words, res, i$, len$, word;
-    words = _.compact(str.split(/\s+/));
-    res = '';
-    for (i$ = 0, len$ = words.length; i$ < len$; ++i$) {
-      word = words[i$];
-      if (word === target) {
-        res = res + " " + func(word);
-      } else {
-        res += " " + word;
-      }
-    }
-    return res;
-  }
   CodeBuilder = (function(){
     CodeBuilder.displayName = 'CodeBuilder';
     var prototype = CodeBuilder.prototype, constructor = CodeBuilder;
@@ -109,39 +10,85 @@
     CodeBuilder.maxDepth = 7;
     CodeBuilder.grammar = {
       S: 'EXP',
-      EXP: [' FUNC ( EXP , EXP ) ', 'VAR'],
+      EXP: ['FUNC(EXP, EXP)', 'VAR'],
       FUNC: ['add', 'sub', 'div', 'mul'],
       VAR: ['x', '1.0']
     };
+    CodeBuilder.terminalKeys = ['VAR'];
+    CodeBuilder.expandableKeys = ['EXP'];
     CodeBuilder.functionDefinitions = 'function add(a, b) {\n  return a + b;\n}\n\nfunction sub(a, b) {\n  return a - b;\n}\n\nfunction div(a, b) {\n  if (b === 0) {\n    return a;\n  } else {\n    return a / b;\n  }\n}\n\nfunction mul(a, b) {\n  return a * b;\n}';
     function CodeBuilder(integers){
-      var ref$, done, offset, depth, symbolicString, this$ = this;
-      ref$ = [false, 0, 0], done = ref$[0], offset = ref$[1], depth = ref$[2];
-      symbolicString = constructor.grammar['S'];
+      var ref$;
+      this.integers = integers;
+      this.filterForDepth = bind$(this, 'filterForDepth', prototype);
+      this.isExpandable = bind$(this, 'isExpandable', prototype);
+      this.isTerminal = bind$(this, 'isTerminal', prototype);
+      this.expansionForKey = bind$(this, 'expansionForKey', prototype);
+      ref$ = [0, 0], this.offset = ref$[0], this.depth = ref$[1];
+      this.symbolicString = constructor.grammar['S'];
       do {
-        done = true;
-        _.chain(constructor.grammar).keys().each(fn$);
-        depth++;
-      } while (!done);
-      this.code = constructor.functionDefinitions + "\n\n" + symbolicString;
-      function fn$(key){
-        return symbolicString = gsub(symbolicString, key, function(k){
-          var set, next, integer;
-          done = false;
-          set = k === 'EXP' && depth >= constructor.maxDepth - 1
-            ? constructor.grammar['VAR']
-            : constructor.grammar[k];
-          do {
-            integer = integers[offset] % set.length;
-            offset = offset === integers.length - 1
-              ? 0
-              : offset + 1;
-            next = set[integer];
-          } while (!(depth > constructor.minDepth || next !== 'VAR'));
-          return next;
-        });
-      }
+        this.expandKeys();
+      } while (this['continue']());
+      this.code = constructor.functionDefinitions + "\n\n" + this.symbolicString + ";";
     }
+    prototype.expandKeys = function(){
+      var this$ = this;
+      _.chain(constructor.grammar).keys().each(function(key){
+        return this$.expandKey(key);
+      });
+      return this.depth++;
+    };
+    prototype.expandKey = function(key){
+      return this.symbolicString = this.symbolicString.replace(new RegExp(key, 'g'), this.expansionForKey);
+    };
+    prototype.expansionForKey = function(key){
+      var set, index;
+      set = this.optionsForKey(key);
+      index = this.nextInteger() % set.length;
+      this.incrementOffset();
+      return set[index];
+    };
+    prototype.isTerminal = function(key){
+      return _.any(constructor.terminalKeys, function(it){
+        return key === it;
+      });
+    };
+    prototype.isExpandable = function(str){
+      return _.any(constructor.expandableKeys, function(it){
+        return str.match(it);
+      });
+    };
+    prototype.optionsForKey = function(key){
+      return this.filterForDepth(
+      constructor.grammar[key]);
+    };
+    prototype.filterForDepth = function(options){
+      switch (false) {
+      case !(this.depth < constructor.minDepth):
+        return _.reject(options, this.isTerminal);
+      case !(this.depth > constructor.maxDepth - 1):
+        return _.reject(options, this.isExpandable);
+      default:
+        return options;
+      }
+    };
+    prototype.nextInteger = function(){
+      return this.integers[this.offset];
+    };
+    prototype.incrementOffset = function(){
+      return this.offset = this.offset === this.integers.length - 1
+        ? 0
+        : this.offset + 1;
+    };
+    prototype['continue'] = function(){
+      var patterns, this$ = this;
+      patterns = _.chain(constructor.grammar).keys().map(function(it){
+        return new RegExp(it);
+      }).value();
+      return _.any(patterns, function(it){
+        return it.test(this$.symbolicString);
+      });
+    };
     return CodeBuilder;
   }());
   Tournament = (function(){
@@ -237,18 +184,5 @@
   }());
   function bind$(obj, key, target){
     return function(){ return (target || obj)[key].apply(obj, arguments) };
-  }
-  function repeatString$(str, n){
-    for (var r = ''; n > 0; (n >>= 1) && (str += str)) if (n & 1) r += str;
-    return r;
-  }
-  function partialize$(f, args, where){
-    return function(){
-      var params = slice$.call(arguments), i,
-          len = params.length, wlen = where.length,
-          ta = args ? args.concat() : [], tw = where ? where.concat() : [];
-      for(i = 0; i < len; ++i) { ta[tw[0]] = params[i]; tw.shift(); }
-      return len < wlen && len ? partialize$(f, ta, tw) : f.apply(this, ta);
-    };
   }
 }).call(this);
