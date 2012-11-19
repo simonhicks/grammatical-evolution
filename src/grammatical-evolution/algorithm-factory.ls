@@ -17,7 +17,7 @@ class exports.AlgorithmFactory
     do
       _ @grammar.keys .each (key) ~>
         @expand-key(state, key)
-      @depth++
+      state.depth++
     until @grammar.is-finished state.code
     "#{@prefix-code}\n#{state.code}\n#{@postfix-code}"
 

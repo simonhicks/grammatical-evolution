@@ -3,6 +3,8 @@ should = require \should
 {AlgorithmFactory} = require '../../grammatical-evolution/algorithm-factory'
 {Grammar} = require '../../grammatical-evolution/grammar'
 
+# TODO find a way to test the depth control
+
 suite 'AlgorithmFactory', ->
   setup ->
     @min-opts =
@@ -114,13 +116,53 @@ suite 'AlgorithmFactory', ->
 
   suite 'integration tests', ->
     setup ->
-      @assert-factory = (factory) ->
-        # using 10 sets of ints:
-        # - ensure the builds are repeatable
-        # - ensure they produce results with no KEYs, `undefined`s or `null`s
-        # - unsure they product syntactically valid js
+      @create-ints = (n) ->
+        [Math.floor(128 * Math.random()) for i from 1 to n]
 
-    test 'with a simple grammar'
-    test 'with a more complex grammar'
+    suite 'with a simple grammar', ->
+      setup ->
+        @factory = new AlgorithmFactory do
+          grammar: new Grammar do
+            rules:
+              S: ['FUNC(EXP, EXP)']
+              EXP: <[ S VAR ]>
+              FUNC: <[ add sub mul div ]>
+              VAR: <[ x 1 ]>
+            min-depth: 2
+            max-depth: 7
 
-    # TODO find a way to test the depth control
+      test 'the builds should be repeatable', ->
+        ints = @create-ints 10
+        @factory.build ints .should.equal @factory.build ints
+
+      test "the builds should produce strings with no keys, undefined's or null", ->
+        code = @factory.build @create-ints 10
+        code.should.not.match /undefined/
+        code.should.not.match /null/
+        for key in @factory.grammar.keys
+          code.should.not.match new RegExp(key)
+
+    suite 'with a more complex grammar', ->
+      setup ->
+        @factory = new AlgorithmFactory do
+          grammar: new Grammar do
+            rules:
+              S: ['EXP']
+              EXP: ['B-FUNC(EXP, EXP)', 'T-FUNC(EXP, EXP, EXP)', 'VAR']
+              B-FUNC: <[ add sub mul div ]>
+              T-FUNC: <[ foo bar ]>
+              VAR: <[ INPUT CONST ]>
+              INPUT: <[ get-x() get-y() get-z() ]>
+              CONST: <[ 1 PI E ]>
+            min-depth: 2
+            max-depth: 7
+      test 'the builds should be repeatable', ->
+        ints = @create-ints 10
+        @factory.build ints .should.equal @factory.build ints
+
+      test "the builds should produce strings with no keys, undefined's or null", ->
+        code = @factory.build @create-ints 10
+        code.should.not.match /undefined/
+        code.should.not.match /null/
+        for key in @factory.grammar.keys
+          code.should.not.match new RegExp(key)
