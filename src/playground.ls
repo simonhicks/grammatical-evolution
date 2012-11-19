@@ -51,7 +51,7 @@ class CodeBuilder
     @symbolic-string = @@grammar[\S]
     do
       @expand-keys()
-    while @continue()
+    until @finished()
     @code = "#{@@function-definitions}\n\n#{@symbolic-string};"
 
   expand-keys: ->
@@ -75,9 +75,9 @@ class CodeBuilder
   increment-offset: ->
     @offset = if (@offset == @integers.length - 1) then 0 else @offset + 1
 
-  continue: ->
+  finished: ->
     patterns = _.chain @@grammar .keys!.map(-> new RegExp(it)).value()
-    _.any patterns, ~> it.test(@symbolic-string)
+    not _.any patterns, ~> it.test(@symbolic-string)
 
   ## returns true if `key` can't be expanded any further
   #is-terminal: (key) ~>

@@ -169,3 +169,13 @@ suite 'Grammar', ->
       instance = @create-instance()
       expected = _.select @opts.rules.EXP, -> instance.is-expandable(it)
       instance.get-options-for(\EXP, 1).should.eql expected
+
+
+  suite 'when inspecting generated strings', ->
+    test 'should know when something is finished', ->
+      instance = @create-instance()
+      instance.is-finished('add(div(x, 3), 1)').should.equal true
+
+    test "should know when something isn't finished", ->
+      instance = @create-instance()
+      instance.is-finished('add(div(x, 3), VAR)').should.equal false

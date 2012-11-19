@@ -61,3 +61,6 @@ class exports.Grammar
   _filter-if-possible: (exprs, pred) ~>
     filtered = _.reject exprs, pred
     if filtered.length is 0 then exprs else filtered
+
+  is-finished: (string) ->
+    not @key-regexp.test string
