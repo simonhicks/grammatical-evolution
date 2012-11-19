@@ -8,9 +8,6 @@ class exports.AlgorithmFactory
     unless @grammar?
       throw new Error "Missing mandatory arg `grammar`"
 
-  #create: (integers) ->
-    ## TODO create a 'state' object and pass it around instead of this from the playground impl
-
   build: (ints) ->
     state =
       integers: ints
