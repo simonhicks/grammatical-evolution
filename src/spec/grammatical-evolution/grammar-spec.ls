@@ -18,6 +18,7 @@ suite 'Grammar', ->
       invalid = ~>
         new Grammar @args(null)
       invalid.should.throw-error /\brules\b/
+      invalid.should.throw-error /missing mandatory arg/i
 
     test 'should have a default max-depth and min-depth', ->
       no-depths = ~>

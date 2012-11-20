@@ -33,14 +33,15 @@ class exports.GeneHelperBuilder
           if maybe(point-mutation-rate/bits.length) then flip-bit bit else bit
         child.join ''
 
-      @single-point-crossover = (p1, p2) ~>
+      @single-point-crossover = (bits1, bits2) ~>
         if (maybe crossover-rate)
-          p1-ints = @bits-to-ints p1
-          p2-ints = @bits-to-ints p2
-          cut = random-int(_.min([p1-ints.length, p2-ints.length]))
+          p1-ints = @bits-to-ints bits1
+          p2-ints = @bits-to-ints bits2
+          #cut = random-int(_.min([p1-ints.length, p2-ints.length]))
+          cut = random-int(_.min([p1-ints.length, p2-ints.length]) - 1) + 1
           @ints-to-bits p1-ints[0 til cut].concat(p2-ints.slice(cut))
         else
-          p1
+          bits1
 
       @duplicate-codon = (bits) ~>
         if (maybe duplication-rate/codon-bits)
@@ -61,10 +62,10 @@ class exports.GeneHelperBuilder
           bits
 
       @random-bitstring = ~>
-        [random-int base for i from 0 til number-of-codons] |> @ints-to-bits
+        [random-int(base) for i from 0 til (number-of-codons * codon-bits)].join('')
 
       @reproduce = (p1, p2) ~>
-        @single-point-crossover p1, p2 |> @duplicate-codon |> @delete-codon |> @point-mutation
+        @single-point-crossover(p1, p2) |> @duplicate-codon |> @delete-codon |> @mutate-point
 
       this
 

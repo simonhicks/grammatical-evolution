@@ -6,10 +6,12 @@ _ = require \underscore
 # stubs Math.random so it returns the expected results in sucession, then constant (or the original
 # random function if constant doesn't exist)
 function with-predictable-random(expected, constant, code)
-  old-random = Math.random
-  Math.random = -> expected.shift() ? if constant? then constant else old-random()
-  code()
-  Math.random = old-random
+  try
+    old-random = Math.random
+    Math.random = -> expected.shift() ? if constant? then constant else old-random()
+    code()
+  finally
+    Math.random = old-random
 
 suite 'GeneHelperBuilder', ->
 
@@ -91,10 +93,11 @@ suite 'GeneHelperBuilder', ->
       test 'should respect codon boundaries', ->
         # 0 to ensure the crossover occurs, and 0.5 to choose the cut point
         with-predictable-random [0, 0.5], 1, ~>
-          p1 = '000000000000'
-          p2 = '111111111111'
+          p1 = '0000000000000000'
+          p2 = '1111111111111111'
           # the cut point is rounded down from the middle to the preceding codon boundary
-          @helper.single-point-crossover(p1, p2).should.equal '000011111111'
+          # (cut should be at 1 + 0.5 * (length - 1) => 2.5 => 2
+          @helper.single-point-crossover(p1, p2).should.equal '0000000011111111'
 
       test 'should crossover at a random point', ->
         with-predictable-random [0, 0.3], 1, ~>
