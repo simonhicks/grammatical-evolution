@@ -1,4 +1,5 @@
 _ = require \underscore
+uuid = require \node-uuid
 {Grammar} = require './grammar'
 {GeneHelperBuilder} = require './gene-helper-builder'
 {AlgorithmFactory} = require './algorithm-factory'
@@ -40,9 +41,11 @@ class exports.SpeciesBuilder
 
     function create-critter(bits)
       code = algorithm-factory.build gene-helper.bits-to-ints(bits)
+      id = uuid.v4() # random unique id
       new
         get-genome: -> bits
         get-code: -> code
+        get-id: -> id
         screw: (partner) ->
           gene-helper.reproduce(bits, partner.get-genome()) |> create-critter
 

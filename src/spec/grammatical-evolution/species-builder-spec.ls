@@ -96,6 +96,13 @@ suite 'SpeciesBuilder', ->
         kid.should.have-own-property 'getCode'
         kid.should.have-own-property 'screw'
 
+      test 'which has a unique id', ->
+        builder = @create-builder()
+        species = builder.build-species()
+        critter1 = species.create()
+        critter2 = species.create()
+        critter1.get-id().should.not.equal critter2.get-id()
+
       test 'uses the gene-helper settings for reproduction', ->
         # create a species which allows no mutation and has a 100% chance of crossover
         builder = @create-builder do
