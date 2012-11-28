@@ -11,10 +11,10 @@ species-builder = new SpeciesBuilder do
       EXP: ['(EXP OP EXP)', 'EXP OP EXP', 'VAR']
       OP: <[ * / + - ]>
       VAR: <[ x 1 ]>
-    max-depth: 6
-    min-depth: 0
+    max-depth: 7
+    min-depth: 2
   genetics:
-    #base: 2
+    base: 2
     codon-bits: 4
 
 Species = species-builder.build-species()
@@ -41,9 +41,10 @@ class FunctionApproximationComparator
 
   calculate-fitness: (bots) ~>
     for bot in bots
-      bot.error = 0
+      error = 0
       _.times @comparisons, ~>
-        bot.error += @get-error bot
+        error += @get-error bot
+      bot.error = error / @comparisons
 
 comparator = new FunctionApproximationComparator do
   comparisons: 30
@@ -51,7 +52,7 @@ comparator = new FunctionApproximationComparator do
   max-input: 10
   min-input: 1
 
-cupid = new Cupid children-per-couple: 1
+cupid = new Cupid children-per-couple: 2
 
 # create some utility functions for later
 function random-int(max)
@@ -69,7 +70,7 @@ function get-best(bots)
 
 
 # basic parameters
-generation-size = 1000
+generation-size = 100
 number-of-generations = 50
 
 # initial state
@@ -78,9 +79,11 @@ generation = 1
 parents = []
 
 
+best = {error: 99999999}
 while generation <= number-of-generations
   comparator.calculate-fitness(population)
-  best = get-best(population)
+  winner = get-best(population)
+  best = if best.error < winner.error then best else winner
   console.log "Generation #generation : err=#{best.error} : code='#{best.get-code().replace(/\n/g, '')}'"
 
   until parents.length is generation-size * 2
