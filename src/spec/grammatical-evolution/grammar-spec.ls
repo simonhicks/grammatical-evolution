@@ -177,6 +177,7 @@ suite 'Grammar', ->
       instance = @create-instance()
       instance.is-finished('add(div(x, 3), 1)').should.equal true
 
-    test "should know when something isn't finished", ->
+    test "should know when something isn't finished, no matter how often you ask!", ->
       instance = @create-instance()
-      instance.is-finished('add(div(x, 3), VAR)').should.equal false
+      _.times 100, -> # this is required because node RegExps are stateful
+        instance.is-finished('add(div(x, 3), VAR)').should.equal false

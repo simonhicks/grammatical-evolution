@@ -1,4 +1,5 @@
 should = require \should
+_ = require \underscore
 
 {AlgorithmFactory} = require '../../grammatical-evolution/algorithm-factory'
 {Grammar} = require '../../grammatical-evolution/grammar'
@@ -17,6 +18,7 @@ suite 'AlgorithmFactory', ->
     @create-factory = ->
       new AlgorithmFactory @min-opts
 
+
   suite 'when being configured', ->
     @test-optional-argument = (field, dflt) ->
       test "takes an optional #field arg", ->
@@ -26,9 +28,11 @@ suite 'AlgorithmFactory', ->
         @create-factory.should.not.throw-error
         @create-factory()[field].should.eql @min-opts[field]
 
+
       test "has a default value of #dflt for #field", ->
         @min-opts[field] = null
-        @create-factory()[field].should.equal dflt
+        should.equal @create-factory()[field], dflt
+
 
     test 'requires a grammar argument', ->
       factory = @create-factory()
@@ -40,6 +44,7 @@ suite 'AlgorithmFactory', ->
 
     @test-optional-argument('prefixCode', '')
     @test-optional-argument('postfixCode', '')
+    @test-optional-argument('wrapperFunction', null)
 
 
   suite 'when building an algorithm', ->
@@ -49,6 +54,7 @@ suite 'AlgorithmFactory', ->
       ints = context.integers
       n = ints.length * 2 - 1
       [factory.next-integer(context) for i from 0 to n].should.eql ints.concat ints
+
 
     suite 'expansion-for-key(...)', ->
       test 'should choose the nth item from the appropriate list of exprs', ->
@@ -68,6 +74,7 @@ suite 'AlgorithmFactory', ->
         [factory.expansion-for-key(context, \KEY) for i from 0 to 3].should.eql expected
         received.should.eql [\KEY, context.depth]
 
+
     suite 'expand-key(...)', ->
       test 'should replace the given key with the appropriate expansion from the Grammar', ->
         # create a factory with a mock Grammar
@@ -83,6 +90,7 @@ suite 'AlgorithmFactory', ->
           code: "BEFORE FOO BEFORE"
         factory.expand-key(context, \BEFORE)
         context.code.should.equal "AFTER1 FOO AFTER2"
+
 
     suite 'build(ints)', ->
       test 'should repeatedly replace the keys until there are none left (starting from S)', ->
@@ -114,10 +122,12 @@ suite 'AlgorithmFactory', ->
 
         factory.build(ints).should.match(/div\(sub\(1, x\), x\)/)
 
+
   suite 'integration tests', ->
     setup ->
       @create-ints = (n) ->
         [Math.floor(128 * Math.random()) for i from 1 to n]
+
 
     suite 'with a simple grammar', ->
       setup ->
@@ -131,9 +141,11 @@ suite 'AlgorithmFactory', ->
             min-depth: 2
             max-depth: 7
 
+
       test 'the builds should be repeatable', ->
         ints = @create-ints 10
         @factory.build ints .should.equal @factory.build ints
+
 
       test "the builds should produce strings with no keys, undefined's or null", ->
         code = @factory.build @create-ints 10
@@ -141,6 +153,7 @@ suite 'AlgorithmFactory', ->
         code.should.not.match /null/
         for key in @factory.grammar.keys
           code.should.not.match new RegExp(key)
+
 
     suite 'with a more complex grammar', ->
       setup ->
@@ -156,9 +169,12 @@ suite 'AlgorithmFactory', ->
               CONST: <[ 1 PI E ]>
             min-depth: 2
             max-depth: 7
+
+
       test 'the builds should be repeatable', ->
         ints = @create-ints 10
         @factory.build ints .should.equal @factory.build ints
+
 
       test "the builds should produce strings with no keys, undefined's or null", ->
         code = @factory.build @create-ints 10
@@ -166,3 +182,34 @@ suite 'AlgorithmFactory', ->
         code.should.not.match /null/
         for key in @factory.grammar.keys
           code.should.not.match new RegExp(key)
+
+
+  suite 'when building an algorithm', ->
+    setup ->
+      @opts =
+        grammar: new Grammar do
+          rules:
+            S: <[ EXP ]>
+            EXP: ['EXP OP EXP', '(EXP OP EXP)', 'VAR']
+            OP: <[ + - * / ]>
+            VAR: <[ 1 x ]>
+          min-depth: 2
+          max-depth: 7
+      @create-factory = (opts) ->
+        opts = _.extend({}, @opts, opts)
+        new AlgorithmFactory opts
+
+
+    test 'should add prefixCode to the beginning of the code', ->
+      factory = @create-factory prefix-code: 'foo'
+      factory.build('101010101010').should.match /^foo/
+
+
+    test 'should add postfixCode to the end of the code', ->
+      factory = @create-factory postfix-code: 'bar'
+      factory.build '101010101010' .should.match /bar$/
+
+
+    test 'should wrap the generated code in a function call when given a wrapper-function arg', ->
+      factory = @create-factory prefix-code: 'foo', wrapper-function: 'bar', postfix-code: 'baz'
+      factory.build '1010101010101' .should.match /^foo\nfunction bar\(\)\s*{\n  return .*;\n}\nbaz/

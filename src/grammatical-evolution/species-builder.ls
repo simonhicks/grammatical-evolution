@@ -9,9 +9,9 @@ class exports.SpeciesBuilder
     @algorithm-factory = @_create-algorithm-factory(opts)
     @gene-helper = @_create-gene-helper(opts)
 
-  _create-algorithm-factory: ({grammar,postfix-code,prefix-code}:opts) ->
+  _create-algorithm-factory: ({grammar,postfix-code,prefix-code, wrapper-function}:opts) ->
     grammar = @_create-grammar opts
-    new AlgorithmFactory grammar: grammar, postfix-code: postfix-code, prefix-code: prefix-code
+    new AlgorithmFactory grammar: grammar, postfix-code: postfix-code, prefix-code: prefix-code, wrapper-function: wrapper-function
 
   _create-grammar: ({grammar}) ->
     unless grammar?

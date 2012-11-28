@@ -37,7 +37,6 @@ class exports.GeneHelperBuilder
         if (maybe crossover-rate)
           p1-ints = @bits-to-ints bits1
           p2-ints = @bits-to-ints bits2
-          #cut = random-int(_.min([p1-ints.length, p2-ints.length]))
           cut = random-int(_.min([p1-ints.length, p2-ints.length]) - 1) + 1
           @ints-to-bits p1-ints[0 til cut].concat(p2-ints.slice(cut))
         else

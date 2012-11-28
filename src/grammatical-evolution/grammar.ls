@@ -7,7 +7,7 @@ class exports.Grammar
   ({@rules, @max-depth=@@MAX-DEPTH, @min-depth=@@MIN-DEPTH}) ->
     @validate-args()
     @keys = _.keys @rules
-    @key-regexp = new RegExp @keys.join("|"), 'g'
+    @key-regexp-str = @keys.join("|")
     @validate-rules()
 
   validate-args: ->
@@ -47,7 +47,7 @@ class exports.Grammar
     @_is-expandable-key-cache[key] ?= _.any @rules[key], ~> @_is-expandable-expr(it)
 
   _is-expandable-expr: (expr) ~>
-    if matched-keys = expr.match(@key-regexp)
+    if matched-keys = expr.match(new RegExp(@key-regexp-str, 'g'))
       if matched-keys.length > 1
         true
       else
@@ -62,5 +62,5 @@ class exports.Grammar
     filtered = _.reject exprs, pred
     if filtered.length is 0 then exprs else filtered
 
-  is-finished: (string) ->
-    not @key-regexp.test string
+  is-finished: (string) ~>
+    return not new RegExp(@key-regexp-str).test string
