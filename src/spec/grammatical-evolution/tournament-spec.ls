@@ -42,15 +42,11 @@ suite 'Tournament', ->
 
     suite 'when selecting competitors', ->
       setup ->
-        @competitors =
-          * get-id: -> '1', get-code: -> '1'
-          * get-id: -> '2', get-code: -> '2'
-          * get-id: -> '3', get-code: -> '3'
-          * get-id: -> '4', get-code: -> '4'
-          * get-id: -> '5', get-code: -> '5'
-          * get-id: -> '6', get-code: -> '6'
-          * get-id: -> '7', get-code: -> '7'
-          * get-id: -> '8', get-code: -> '8'
+        @competitors = []
+        _.times 100, (i) ~>
+          @competitors.push do
+            get-id: -> "#i"
+            get-code: -> "#i"
 
 
       test 'accepts an optional number-of-competitors arg', ->
@@ -61,8 +57,8 @@ suite 'Tournament', ->
 
 
       test 'randomly selects competitors when too many are passed in', ->
-        tournament1 = @create-tournament number-of-competitors: 2, competitors: @competitors
-        tournament2 = @create-tournament number-of-competitors: 2, competitors: @competitors
+        tournament1 = @create-tournament number-of-competitors: 20, competitors: @competitors
+        tournament2 = @create-tournament number-of-competitors: 20, competitors: @competitors
         get-ids = (tournament) -> _(tournament.competitors).map(-> it.get-id())
         get-ids(tournament1).should.not.eql get-ids(tournament2)
 

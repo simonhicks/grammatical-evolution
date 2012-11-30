@@ -7,6 +7,7 @@ _ = require \underscore
 
 suite 'SpeciesBuilder', ->
   setup ->
+    @expected-default-children-per-couple = 2
     @valid-grammar-config =
         rules:
           S: ['FUNC(EXP, EXP)']
@@ -25,27 +26,49 @@ suite 'SpeciesBuilder', ->
       @opts = grammar: @valid-grammar-config
       @create-builder.should.not.throw-error()
 
+
     test 'accepts a pre-existing Grammar instance', ->
       @create-builder.should.not.throw-error(grammar: new Grammar @valid-grammar-config)
 
+
     test 'requires either a Grammar instance or the grammar config', ->
       (~> @create-builder(grammar: null)).should.throw-error(/grammar/)
+
 
     test 'uses the created grammar object to construct an AlgorithmFactory', ->
       grammar = new Grammar @valid-grammar-config
       builder = @create-builder(grammar: grammar)
       builder.algorithm-factory.grammar.should.equal grammar
 
+
     test 'accepts prefix-code and postfix-code for the AlgorithmFactory', ->
       builder = @create-builder postfix-code: 'foo', prefix-code: 'bar'
       builder.algorithm-factory.postfix-code.should.equal 'foo'
       builder.algorithm-factory.prefix-code.should.equal 'bar'
+
 
     test "defaults to creating a default GeneHelper", ->
       builder = @create-builder()
       helper = builder.gene-helper
       default-helper = new GeneHelperBuilder().build()
       _.keys(helper).should.eql _.keys(default-helper)
+
+
+    test 'accepts an optional childrenPerCouple option', ->
+      n = 6
+      builder = @create-builder children-per-couple: n
+      builder.children-per-couple.should.equal n
+
+
+    test "validates that childrenPerCouple is an integer", ->
+      @opts.children-per-couple = 1.2
+      @create-builder.should.throw-error /\bchildrenPerCouple\b/
+
+
+    test "defaults to #{@expected-default-children-per-couple} children per couple", ->
+      builder = @create-builder children-per-couple: null
+      builder.children-per-couple.should.equal @expected-default-children-per-couple
+
 
     test 'uses GeneHelperBuilder config options to build the GeneHelper', ->
       @opts.genetics =
@@ -66,7 +89,7 @@ suite 'SpeciesBuilder', ->
       # perform an operation that would invoke the #build() method on the algorithm-factory
       species.create()
 
-    suite '.create() returns an object', ->
+    suite 'which has a .create() method which returns an object', ->
       test 'with a bitstring that conforms to the gene-helper settings', ->
         builder = @create-builder do
           grammar: @valid-grammar-config
@@ -137,3 +160,43 @@ suite 'SpeciesBuilder', ->
         created-after = species.create()
         pre-existing.screw created-after
         created-after.screw pre-existing
+
+
+    suite 'has a .match(bots) method which', ->
+      test 'matches the bots as parents and returns their children', ->
+        function make-bot
+          get-genome: -> '01010101010'
+          get-code: -> 'console.log("whatever");'
+          screw: (partner) ->
+            @shags = if @shags? then @shags + 1 else 1
+            partner.shags = if partner.shags? then partner.shags + 1 else 1
+            {}
+
+        parents = []
+        _.times 10, ->
+          parents.push make-bot()
+
+        builder = @create-builder children-per-couple: 2
+        species = builder.build-species()
+        (kids = species.match(parents)).should.have.length(10)
+        _.each parents, -> it.should.have.property \shags, 2
+
+
+    test 'matches the bots randomly, and the pairs should remain monogamous', ->
+      i = 0
+      function make-bot
+        id: i++
+        get-genome: -> '01010101010101'
+        get-code: -> 'console.log("whatever");'
+        screw: (partner) ->
+          (@partners ?= []).push partner.id
+          (partner.partners ?= []).push @id
+
+      parents = []
+      _.times 10, ->
+        parents.push make-bot()
+
+      species = @create-builder(children-per-couple: 7).build-species()
+      species.match(parents)
+      _.each parents, -> it.partners.should.have.length 7
+      _.each parents, -> _.uniq(it.partners).should.have.length 1
