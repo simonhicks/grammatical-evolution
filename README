@@ -1,0 +1,3 @@
+An framework for Genetic Programming using grammatical evolution written in [livescript](http://livescript.net/)
+
+For an example of how to use it, see src/examples/single-threaded.ls for a simple script that uses an arithmetic grammar to approximate a polynomial.
